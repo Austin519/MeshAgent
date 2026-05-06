@@ -57,6 +57,15 @@ done
 
 DEVELOPER_ID="${MESHAGENT_DEVELOPER_ID:-Developer ID Application: Gavon Renfroe (8Z9254T85U)}"
 
+# Prefer the dedicated build keychain (created by setup-build-keychain.sh,
+# imports the Dev ID identity with -A flag = no per-key ACL gating, so
+# SSH-driven codesign works without GUI prompts). Fall back to the login
+# keychain if the build keychain isn't set up yet.
+KEYCHAIN="$HOME/Library/Keychains/meshagent-build.keychain-db"
+if [[ ! -f "$KEYCHAIN" ]]; then
+    KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+fi
+
 if [[ -n "$COMMIT_REF" ]]; then
     echo "=== checking out $COMMIT_REF ==="
     git checkout "$COMMIT_REF"
@@ -83,10 +92,11 @@ if [[ "$USE_ADHOC" == "1" ]]; then
         ./meshagent_osx-arm-64
 else
     echo "=== sign (Developer ID) ==="
+    echo "    using keychain: $KEYCHAIN"
     if ! codesign --force ${CODESIGN_OPTS[@]+"${CODESIGN_OPTS[@]}"} \
         --sign "$DEVELOPER_ID" \
         --identifier MeshAgent \
-        --keychain ~/Library/Keychains/login.keychain-db \
+        --keychain "$KEYCHAIN" \
         ./meshagent_osx-arm-64; then
         echo
         echo "Developer ID sign failed. If you ran this over SSH after a"
