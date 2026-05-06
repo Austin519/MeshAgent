@@ -62,7 +62,12 @@ DEVELOPER_ID="${MESHAGENT_DEVELOPER_ID:-Developer ID Application: Gavon Renfroe 
 # SSH-driven codesign works without GUI prompts). Fall back to the login
 # keychain if the build keychain isn't set up yet.
 KEYCHAIN="$HOME/Library/Keychains/meshagent-build.keychain-db"
-if [[ ! -f "$KEYCHAIN" ]]; then
+BUILD_KC_PWD="meshagentbuild"  # matches setup-build-keychain.sh; not sensitive
+if [[ -f "$KEYCHAIN" ]]; then
+    # Unlock the build keychain (no-op if already unlocked; required after
+    # boot since macOS doesn't auto-unlock arbitrary keychains).
+    security unlock-keychain -p "$BUILD_KC_PWD" "$KEYCHAIN" 2>/dev/null || true
+else
     KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 fi
 
