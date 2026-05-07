@@ -114,6 +114,32 @@ fi
 echo "=== verify ==="
 codesign -dv ./meshagent_osx-arm-64 2>&1 | grep -E "Identifier|Authority|TeamIdentifier|flags"
 
+# Notarize Developer-ID-signed builds. macOS Tahoe gates user-launchd
+# posix_spawn of unnotarized Developer-ID binaries (LaunchAgent auto-
+# load fails with EACCES). Notarization is checked online when the
+# binary is exec'd. Bare Mach-O can't be stapled (only .app/.pkg/.dmg),
+# but the Mac fixture is always online, so online check is fine.
+#
+# Requires a 'MeshAgentNotary' keychain profile pre-set up via:
+#   xcrun notarytool store-credentials MeshAgentNotary \
+#     --apple-id <email> --team-id 8Z9254T85U --password <app-specific-pwd>
+# (one-time, from a Splashtop terminal where login keychain is unlocked)
+#
+# Skip notarization if --no-notarize is passed or in --adhoc mode
+# (ad-hoc binaries don't go through Apple's notary).
+if [[ "$USE_ADHOC" != "1" ]] && [[ "${SKIP_NOTARIZE:-0}" != "1" ]]; then
+    echo "=== notarize (Apple notary, ~5-15 min) ==="
+    NOTARY_ZIP="/tmp/meshagent-notary-$$.zip"
+    ditto -c -k --keepParent ./meshagent_osx-arm-64 "$NOTARY_ZIP"
+    if xcrun notarytool submit "$NOTARY_ZIP" --keychain-profile MeshAgentNotary --wait 2>&1 | tee /tmp/meshagent-notary.log; then
+        echo "    notarization Accepted"
+    else
+        echo "    notarization FAILED — check /tmp/meshagent-notary.log"
+        echo "    (binary will still install but LaunchAgent auto-load may fail on Tahoe)"
+    fi
+    rm -f "$NOTARY_ZIP"
+fi
+
 echo "=== sha384 hash (for hashagents.json on the server) ==="
 shasum -a 384 ./meshagent_osx-arm-64 | awk '{print toupper($1)}'
 
