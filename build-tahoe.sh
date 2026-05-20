@@ -67,6 +67,12 @@ if [[ -f "$KEYCHAIN" ]]; then
     # Unlock the build keychain (no-op if already unlocked; required after
     # boot since macOS doesn't auto-unlock arbitrary keychains).
     security unlock-keychain -p "$BUILD_KC_PWD" "$KEYCHAIN" 2>/dev/null || true
+    # Make sure the build keychain is in the user search list. After a
+    # reboot only login.keychain-db is — codesign --keychain still picks
+    # up identities from the listed keychains and fails with
+    # errSecInternalComponent if ours isn't there.
+    security list-keychains -d user -s "$KEYCHAIN" \
+        $(security list-keychains -d user | sed -e 's/^ *//' -e 's/"//g')
 else
     KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 fi
